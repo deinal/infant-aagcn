@@ -1,6 +1,6 @@
 # infant-aagcn
 
-[![arXiv](https://img.shields.io/badge/arXiv-xxxx.xxxxx-b31b1b.svg)](https://arxiv.org/abs/xxxx.xxxxx)
+[![arXiv](https://img.shields.io/badge/arXiv-2402.14400-b31b1b.svg)](https://arxiv.org/abs/2402.14400)
 
 PyTorch Implementation of Modeling 3D Infant Kinetics Using Adaptive
 Graph Convolutional Networks.
@@ -59,7 +59,7 @@ train.py \
 
 Slurm: `sbatch run/submit.sh` or for the full comparison `sbatch run/experiment.sh`
 
-Training creates a results folder with all runs. The noteboom folder then contain separate files for the ml baseline, aagcn inference and metrics calculation.
+Training creates a results folder with all runs. The notebook folder then contains separate files for the ml baseline, aagcn inference and metrics calculation.
 
 An example of how the models can be called to make predictions is avaialable in the submit script `run/predict.sh`.
 
@@ -69,7 +69,7 @@ An example of how the models can be called to make predictions is avaialable in 
 @article{holmberg2024modeling,
   title={Modeling 3D Infant Kinetics Using Adaptive Graph Convolutional Networks},
   author={Daniel Holmberg and Manu Airaksinen and Viviana Marchi and Andrea Guzzetta and Anna Kivi and Leena Haataja and Sampsa Vanhatalo and Teemu Roos},
-  journal={arXiv preprint arXiv:xxxx.xxxxx},
+  journal={arXiv preprint arXiv:2402.14400},
   year={2024}
 }
 ```
