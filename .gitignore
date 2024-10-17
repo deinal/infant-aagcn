@@ -1,6 +1,7 @@
 data
 slurm
 results
+figures
 lightning_logs
 __pycache__
 .ipynb_checkpoints

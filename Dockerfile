@@ -6,5 +6,5 @@ RUN mkdir -p /.config/matplotlib
 
 RUN pip install -r requirements.txt
 
-ENV PATH=/work/infant-stgnn/bin:$PATH
-ENV PYTHONPATH=/work/infant-stgnn:$PYTHONPATH
+ENV PATH=/work/infant-aagcn/bin:$PATH
+ENV PYTHONPATH=/work/infant-aagcn:$PYTHONPATH

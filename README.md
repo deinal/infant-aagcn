@@ -5,7 +5,7 @@
 PyTorch Implementation of Modeling 3D Infant Kinetics Using Adaptive
 Graph Convolutional Networks.
 
-<img src="figures/learned_graph.png" width="600px"/>
+<img src="graphs.png" width="600px"/>
 
 ## Environment
 
@@ -20,7 +20,7 @@ pip install -Ur requirements.txt
 ### Docker
 
 ```
-docker run -v $(pwd):/work/infant-stgnn -w /work/infant-stgnn --user $(id -u):$(id -g) --gpus all --shm-size 16g -it infant-aagcn
+docker run -v $(pwd):/work/infant-aagcn -w /work/infant-aagcn --user $(id -u):$(id -g) --gpus all --shm-size 16g -it infant-aagcn
 ```
 
 ## Preprocessing
@@ -28,8 +28,8 @@ docker run -v $(pwd):/work/infant-stgnn -w /work/infant-stgnn --user $(id -u):$(
 Data (2 zip archives, 4.8GB) available upon request. Preprocessing expects .csv files with joint coordinates over time.
 
 ```
-./unzip.sh
-./preprocess.sh
+unzip.sh
+preprocess.sh
 ```
 
 - Extract zip archives
