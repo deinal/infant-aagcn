@@ -7,36 +7,37 @@ from torch_geometric.utils.to_dense_adj import to_dense_adj
 import torch.nn.functional as F
 
 
-class GraphAAGCN:
+class Graph:
     r"""
     Defining the Graph for the Two-Stream Adaptive Graph Convolutional Network.
-    It's composed of the normalized inward-links, outward-links and
-    self-links between the nodes as originally defined in the
-    `authors repo  <https://github.com/lshiwjx/2s-AGCN/blob/master/graph/tools.py>`
-    resulting in the shape of (3, num_nodes, num_nodes).
+    It's composed of the normalized self-links, inward-links and outward-links
+    between the nodes resulting in the shape of (3, num_nodes, num_nodes).
     Args:
         edge_index (Tensor array): Edge indices
         num_nodes (int): Number of nodes
+        normalize (bool): Whether to normalize the adjacency matrices
     Return types:
             * **A** (PyTorch Float Tensor) - Three layer normalized adjacency matrix
     """
 
-    def __init__(self, edge_index: list, num_nodes: int):
+    def __init__(self, edge_index: list, num_nodes: int, normalize: bool = True):
         self.num_nodes = num_nodes
         self.edge_index = edge_index
+        self.normalize = normalize
         self.A = self.get_spatial_graph(self.num_nodes)
 
     def get_spatial_graph(self, num_nodes):
         self_mat = torch.eye(num_nodes)
         inward_mat = torch.squeeze(to_dense_adj(self.edge_index))
-        inward_mat_norm = F.normalize(inward_mat, dim=0, p=1)
         outward_mat = inward_mat.transpose(0, 1)
-        outward_mat_norm = F.normalize(outward_mat, dim=0, p=1)
-        adj_mat = torch.stack((self_mat, inward_mat_norm, outward_mat_norm))
+        if self.normalize:
+            inward_mat = F.normalize(inward_mat, dim=0, p=1)
+            outward_mat = F.normalize(outward_mat, dim=0, p=1)
+        adj_mat = torch.stack((self_mat, inward_mat, outward_mat))
         return adj_mat
 
 
-class UnitTCN(nn.Module):
+class TCN(nn.Module):
     r"""
     Temporal Convolutional Block applied to nodes in the Two-Stream Adaptive Graph
     Convolutional Network as originally implemented in the
@@ -52,7 +53,7 @@ class UnitTCN(nn.Module):
     def __init__(
         self, in_channels: int, out_channels: int, kernel_size: int = 9, stride: int = 1
     ):
-        super(UnitTCN, self).__init__()
+        super(TCN, self).__init__()
         pad = int((kernel_size - 1) / 2)
         self.conv = nn.Conv2d(
             in_channels,
@@ -80,7 +81,7 @@ class UnitTCN(nn.Module):
         return x
 
 
-class UnitGCN(nn.Module):
+class GCN(nn.Module):
     r"""
     Modified Graph Convolutional Block applied to nodes in the Two-Stream Adaptive GCN
     as originally implemented in the `Github Repo <https://github.com/lshiwjx/2s-AGCN>`.
@@ -97,6 +98,7 @@ class UnitGCN(nn.Module):
         adaptive (bool, optional): Apply Adaptive Graph Convolutions. (default: :obj:`True`)
         attention (bool, optional): Apply Attention. (default: :obj:`True`)
         masking (bool, optional): Mask adaptive adjacency matrix to learn original edges. (default: :obj:`True`)
+        avg_pool (bool, optional): Use average pooling after message passing. (default: :obj:`False` / sum pooling)
         store_graphs (bool, optional): Whether or not to store learned adjacency matrices (default: :obj:`False`)
         store_attention (bool, optional): Whether or not to store learned attention weights (default: :obj:`False`)
     """
@@ -111,10 +113,11 @@ class UnitGCN(nn.Module):
         adaptive: bool = True,
         attention: bool = True,
         masking: bool = True,
+        avg_pool: bool = False,
         store_graphs: bool = False,
         store_attention: bool = False,
     ):
-        super(UnitGCN, self).__init__()
+        super(GCN, self).__init__()
         self.inter_c = out_channels // coff_embedding
         self.out_c = out_channels
         self.in_c = in_channels
@@ -126,6 +129,7 @@ class UnitGCN(nn.Module):
         self.num_jpts = A.shape[-1]
         self.attention = attention
         self.adaptive = adaptive
+        self.avg_pool = avg_pool
 
         self.conv_d = nn.ModuleList()
 
@@ -208,6 +212,9 @@ class UnitGCN(nn.Module):
         self.PA = nn.Parameter(self.A)
         if self.masking:
             self.mask = Variable((self.A > 0).float(), requires_grad=False)
+        if self.avg_pool:
+            original_A = Variable(self.A, requires_grad=False)
+            self.degree_matrix = torch.sum(original_A, dim=-2, keepdim=False)
         self.alpha = nn.Parameter(torch.zeros(1))
         self.conv_a = nn.ModuleList()
         self.conv_b = nn.ModuleList()
@@ -268,6 +275,10 @@ class UnitGCN(nn.Module):
 
             A2 = x.view(N, C * T, V)
             z = self.conv_d[i](torch.matmul(A2, A1).view(N, C, T, V))
+            if self.avg_pool:
+                degree_matrix = self.degree_matrix[i].unsqueeze(0).unsqueeze(1).unsqueeze(2).to(x.device)
+                degree_mask = (degree_matrix > 0).float()
+                z = z / (degree_matrix + 1e-6) * degree_mask
             y = z + y if y is not None else z
         
         return y
@@ -309,8 +320,8 @@ class AAGCN(nn.Module):
     r"""Layer based on the Two-Stream Adaptive Graph Convolutional Network.
 
     For details see this paper: `"Two-Stream Adaptive Graph Convolutional Networks for
-    Skeleton-Based Action Recognition." <https://arxiv.org/abs/1805.07694>`_.
-    This implementation is based on the authors Github Repo https://github.com/lshiwjx/2s-AGCN.
+    Skeleton-Based Action Recognition. https://arxiv.org/abs/1805.07694.
+    The implementation is based on https://github.com/lshiwjx/2s-AGCN.
 
     Args:
         in_channels (int): Number of input features.
@@ -318,10 +329,11 @@ class AAGCN(nn.Module):
         edge_index (PyTorch LongTensor): Graph edge indices.
         num_nodes (int): Number of nodes in the network.
         stride (int, optional): Time strides during temporal convolution. (default: :obj:`1`)
+        kt (int, optional): Temporal kernel size. (default: :obj:`9`)
         residual (bool, optional): Applying residual connection. (default: :obj:`True`)
         adaptive (bool, optional): Adaptive node connection weights. (default: :obj:`True`)
         attention (bool, optional): Applying spatial-temporal-channel-attention. (default: :obj:`True`)
-        attention (bool, optional): Masking adaptive adjacency matrix to learn original edges. (default: :obj:`True`)
+        masking (bool, optional): Masking adaptive adjacency matrix to learn original edges. (default: :obj:`True`)
         drop_rate (float, optional): Applying dropout between GCN and TCN. (default: :obj:`0.5`)
         store_graphs (bool, optional): Whether or not to store learned adjacency matrices (default: :obj:`False`)
         store_attention (bool, optional): Whether or not to store learned attention weights (default: :obj:`False`)
@@ -334,6 +346,9 @@ class AAGCN(nn.Module):
         edge_index: torch.LongTensor,
         num_nodes: int,
         stride: int = 1,
+        kt: int = 9,
+        normalized_graph: bool = True,
+        avg_pool: bool = False,
         residual: bool = True,
         adaptive: bool = True,
         attention: bool = True,
@@ -346,15 +361,15 @@ class AAGCN(nn.Module):
         self.edge_index = edge_index
         self.num_nodes = num_nodes
 
-        self.graph = GraphAAGCN(self.edge_index, self.num_nodes)
+        self.graph = Graph(self.edge_index, self.num_nodes, normalize=normalized_graph)
         self.A = self.graph.A
 
-        self.gcn = UnitGCN(
-            in_channels, out_channels, self.A, 
+        self.gcn = GCN(
+            in_channels, out_channels, self.A, avg_pool=avg_pool,
             adaptive=adaptive, attention=attention, masking=masking,
             store_graphs=store_graphs, store_attention=store_attention,
         )
-        self.tcn = UnitTCN(out_channels, out_channels, stride=stride)
+        self.tcn = TCN(out_channels, out_channels, kernel_size=kt, stride=stride)
         self.relu = nn.ReLU(inplace=True)
         self.attention = attention
         self.dropout = nn.Dropout(drop_rate)
@@ -366,7 +381,7 @@ class AAGCN(nn.Module):
             self.residual = lambda x: x
 
         else:
-            self.residual = UnitTCN(
+            self.residual = TCN(
                 in_channels, out_channels, kernel_size=1, stride=stride
             )
 

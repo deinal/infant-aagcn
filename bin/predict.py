@@ -11,7 +11,8 @@ import pytorch_lightning as pl
 from torch.utils.data import DataLoader
 from modules.data import InfantMotionDataset
 from modules.model import AdaptiveSTGCN
-from modules.constants import N, EDGE_INDEX, PHYSICAL_EDGE_INDEX
+from modules.constants import N, PHYS_EDGE_INDEX, COORD_EDGE_INDEX, FC_EDGE_INDEX
+
 
 if __name__ == '__main__':
     # Parse command line arguments
@@ -21,8 +22,8 @@ if __name__ == '__main__':
     arg_parser.add_argument('--data-dir', default='data/streams/combined', type=str, help='Directory containing the data')
     arg_parser.add_argument('--age-file', default='metadata/combined.csv', type=str, help='Path to the age file')
     arg_parser.add_argument('--feature-file', default='data/features.csv', type=str, help='Path to the feature file')
-    arg_parser.add_argument('--batch-size', default=32, type=int)
-    arg_parser.add_argument('--num-workers', default=16, type=int)
+    arg_parser.add_argument('--batch-size', default=1, type=int)
+    arg_parser.add_argument('--num-workers', default=1, type=int)
     arg_parser.add_argument('--devices', default=1, type=int)
     args = arg_parser.parse_args()
 
@@ -44,7 +45,12 @@ if __name__ == '__main__':
     k_folds = metadata['args']['k_folds']
     streams = metadata['args']['streams'].split(',')
     xy_data = metadata['args']['xy_data']
-    edge_index = torch.tensor(PHYSICAL_EDGE_INDEX) if metadata['args']['physical_edges'] else torch.tensor(EDGE_INDEX)
+    if metadata['args']['edges'] == 'phys':
+        edge_index = torch.tensor(PHYS_EDGE_INDEX)
+    if metadata['args']['edges'] == 'coord':
+        edge_index = torch.tensor(COORD_EDGE_INDEX)
+    if metadata['args']['edges'] == 'fc':
+        edge_index = torch.tensor(FC_EDGE_INDEX)
 
     # Iterate over each fold
     for fold_n in tqdm(range(1, k_folds + 1)):
@@ -59,12 +65,13 @@ if __name__ == '__main__':
             edge_index=edge_index,
             num_nodes=N,
             in_channels=2*len(streams) if xy_data else 3*len(streams),
-            out_channels=32,
             learning_rate=fold_metadata['args']['learning_rate'],
             adaptive=fold_metadata['args']['adaptive'],
             attention=fold_metadata['args']['attention'],
             masking=fold_metadata['args']['masking'],
             concat_features=fold_metadata['args']['concat_features'],
+            hidden_dim=fold_metadata['args']['hidden_dim'],
+            kt=fold_metadata['args']['kt']
         )
 
         # Predict for all test_ids with severe outcome
@@ -72,8 +79,8 @@ if __name__ == '__main__':
         prediction_fts = fts_data[fts_data['test_id'].isin(prediction_ids)]
 
         # Set up DataLoader for prediction data
-        prediction_dataset = InfantMotionDataset(args.data_dir, prediction_fts, streams, xy_data=xy_data, predict=True)
-        prediction_loader = DataLoader(prediction_dataset, batch_size=32, num_workers=1)
+        prediction_dataset = InfantMotionDataset(fold_metadata['args']['data_dir'], prediction_fts, streams, xy_data=xy_data, predict=True)
+        prediction_loader = DataLoader(prediction_dataset, batch_size=args.batch_size, num_workers=args.num_workers)
 
         # Predict
         trainer = pl.Trainer(accelerator='auto', devices=args.devices)

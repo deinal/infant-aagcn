@@ -1,8 +1,6 @@
 import os
 import sys
 import logging
-import networkx as nx
-from modules.constants import NODE_INDEX, EDGE_LABELS
 from pytorch_lightning.callbacks import Callback
 
 
@@ -36,18 +34,3 @@ def get_logger(name, stdout=sys.stdout, filename=None, loglevel=logging.INFO):
         logger.addHandler(logfile)
     
     return logger
-
-def get_infant_graph(frame):
-    G = nx.Graph()
-
-    bodyparts = iter(NODE_INDEX.keys())
-    for bodypart in bodyparts:
-        G.add_node(NODE_INDEX[bodypart], 
-                   x=frame[f'{bodypart}_x'],
-                   y=frame[f'{bodypart}_y'],
-                   z=frame[f'{bodypart}_z'],
-        )
-    for label_0, label_1 in EDGE_LABELS:
-        G.add_edge(NODE_INDEX[label_0], NODE_INDEX[label_1])
-        
-    return G

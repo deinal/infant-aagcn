@@ -8,13 +8,13 @@ from momo import Momo
 
 class AdaptiveSTGCN(pl.LightningModule):
     def __init__(self, in_channels, edge_index, num_nodes, learning_rate, 
-                 adaptive, attention, masking, concat_features,
+                 adaptive, attention, masking, concat_features, hidden_dim, kt,
                  store_graphs=False, store_attention=False):
         super(AdaptiveSTGCN, self).__init__()
         self.data_bn = torch.nn.BatchNorm1d(in_channels * num_nodes)
         self.l1 = AAGCN(
             in_channels=in_channels,
-            out_channels=32,
+            out_channels=hidden_dim,
             edge_index=edge_index,
             num_nodes=num_nodes,
             adaptive=adaptive,
@@ -22,12 +22,13 @@ class AdaptiveSTGCN(pl.LightningModule):
             masking=masking,
             store_graphs=store_graphs,
             store_attention=store_attention,
+            kt=kt,
             stride=1,
             residual=False,
         )
         self.l2 = AAGCN(
-            in_channels=32,
-            out_channels=32,
+            in_channels=hidden_dim,
+            out_channels=hidden_dim,
             edge_index=edge_index,
             num_nodes=num_nodes,
             adaptive=adaptive,
@@ -35,11 +36,12 @@ class AdaptiveSTGCN(pl.LightningModule):
             masking=masking,
             store_graphs=store_graphs,
             store_attention=store_attention,
+            kt=kt,
             stride=1
         )
         self.l3 = AAGCN(
-            in_channels=32,
-            out_channels=64,
+            in_channels=hidden_dim,
+            out_channels=hidden_dim,
             edge_index=edge_index,
             num_nodes=num_nodes,
             adaptive=adaptive,
@@ -47,29 +49,18 @@ class AdaptiveSTGCN(pl.LightningModule):
             masking=masking,
             store_graphs=store_graphs,
             store_attention=store_attention,
-            stride=1
-        )
-        self.l4 = AAGCN(
-            in_channels=64,
-            out_channels=64,
-            edge_index=edge_index,
-            num_nodes=num_nodes,
-            adaptive=adaptive,
-            attention=attention,
-            masking=masking,
-            store_graphs=store_graphs,
-            store_attention=store_attention,
+            kt=kt,
             stride=1
         )
 
         self.learning_rate = learning_rate
         self.concat_features = concat_features
 
-        fc_input_size = 64 + len(FEATURE_LIST) if concat_features else 64
+        fc_input_size = hidden_dim + len(FEATURE_LIST) if concat_features else hidden_dim
 
-        self.fc1 = torch.nn.Linear(fc_input_size, 32)
+        self.fc1 = torch.nn.Linear(fc_input_size, 64)
         self.relu = torch.nn.ReLU()
-        self.fc2 = torch.nn.Linear(32, 1)
+        self.fc2 = torch.nn.Linear(64, 1)
 
     def forward(self, x, fts):
         N, C, T, V = x.size()
@@ -80,7 +71,6 @@ class AdaptiveSTGCN(pl.LightningModule):
         x = self.l1(x) # (N, C_in, T, V) -> (N, C_out, T//stride, V)
         x = self.l2(x)
         x = self.l3(x)
-        x = self.l4(x)
 
         c_new = x.size(1)
         x = x.view(N, c_new, -1) # N, C, T*V

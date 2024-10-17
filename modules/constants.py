@@ -14,7 +14,34 @@ NODE_INDEX = {
     'left_ear': 16, 'right_ear': 17,
 }
 
-EDGE_LABELS = [
+# Physical edges
+PHYS_EDGE_LABELS = [
+    ('neck', 'nose'),
+    ('neck', 'left_shoulder'),
+    ('neck', 'right_shoulder'),
+    ('left_shoulder', 'left_hip'),
+    ('right_shoulder', 'right_hip'),
+    ('left_shoulder', 'left_elbow'),
+    ('right_shoulder', 'right_elbow'),
+    ('right_elbow', 'right_wrist'),
+    ('left_elbow', 'left_wrist'),
+    ('left_hip', 'left_knee'),
+    ('right_hip', 'right_knee'),
+    ('left_knee', 'left_ankle'),
+    ('right_knee', 'right_ankle'),
+    ('nose', 'left_eye'),
+    ('nose', 'right_eye'),
+    ('left_eye', 'left_ear'),
+    ('right_eye', 'right_ear'),
+]
+
+PHYS_EDGE_INDEX = [[], []]
+for (src, dest) in PHYS_EDGE_LABELS:
+    PHYS_EDGE_INDEX[0].append(NODE_INDEX[src])
+    PHYS_EDGE_INDEX[1].append(NODE_INDEX[dest])
+
+# Coordination edges
+COORD_EDGE_LABELS = [
     ('neck', 'nose'),
     ('neck', 'left_shoulder'),
     ('neck', 'right_shoulder'),
@@ -46,35 +73,20 @@ EDGE_LABELS = [
     ('left_wrist', 'right_ankle'),
 ]
 
-EDGE_INDEX = [[], []]
-for (src, dest) in EDGE_LABELS:
-    EDGE_INDEX[0].append(NODE_INDEX[src])
-    EDGE_INDEX[1].append(NODE_INDEX[dest])
+COORD_EDGE_INDEX = [[], []]
+for (src, dest) in COORD_EDGE_LABELS:
+    COORD_EDGE_INDEX[0].append(NODE_INDEX[src])
+    COORD_EDGE_INDEX[1].append(NODE_INDEX[dest])
 
-PHYSICAL_EDGES = [
-    ('neck', 'nose'),
-    ('neck', 'left_shoulder'),
-    ('neck', 'right_shoulder'),
-    ('left_shoulder', 'left_hip'),
-    ('right_shoulder', 'right_hip'),
-    ('left_shoulder', 'left_elbow'),
-    ('right_shoulder', 'right_elbow'),
-    ('right_elbow', 'right_wrist'),
-    ('left_elbow', 'left_wrist'),
-    ('left_hip', 'left_knee'),
-    ('right_hip', 'right_knee'),
-    ('left_knee', 'left_ankle'),
-    ('right_knee', 'right_ankle'),
-    ('nose', 'left_eye'),
-    ('nose', 'right_eye'),
-    ('left_eye', 'left_ear'),
-    ('right_eye', 'right_ear'),
-]
+# Fully Connected
+FC_EDGE_INDEX = [[], []]
 
-PHYSICAL_EDGE_INDEX = [[], []]
-for (src, dest) in PHYSICAL_EDGES:
-    PHYSICAL_EDGE_INDEX[0].append(NODE_INDEX[src])
-    PHYSICAL_EDGE_INDEX[1].append(NODE_INDEX[dest])
+# Loop through all possible pairs of nodes
+for i in range(len(NODE_INDEX)):
+    for j in range(len(NODE_INDEX)):
+        if i != j:  # Exclude self-loops
+            FC_EDGE_INDEX[0].append(i)
+            FC_EDGE_INDEX[1].append(j)
 
 FEATURE_LIST = [
     'hands_position_cca_z', 'feet_position_cca_z',

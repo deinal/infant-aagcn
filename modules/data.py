@@ -35,16 +35,11 @@ class InfantMotionDataset(Dataset):
         df_multi = feather.read_dataframe(fpath).xs(augment_name)
         
         all_streams_data = [df_multi.xs(s).values for s in self.streams]
-        data_npy = np.stack(all_streams_data, axis=-1) # (T, N*3, S)
+        data_npy = np.stack(all_streams_data, axis=-1) # (T, N*3 pr N*2, S)
 
         if self.xy_data:
-            # Extract x and y coordinates for each node
-            x_coords = data_npy[:, 0::3, :] # (T, N, S)
-            y_coords = data_npy[:, 1::3, :] # (T, N, S)
-            
-            # Combine x and y coordinates
-            data_reshaped = np.concatenate([x_coords, y_coords], axis=1) # (T, 2*N, S)
-            data_reshaped = data_reshaped.transpose(1, 0, 2).reshape(2*len(self.streams), T, N) # (2*S, T, N)
+            # Reshape 2D: (T, N*2, S) -> (T, N, 2, S) -> (2, T, N, S) -> (2*S, T, N)
+            data_reshaped = data_npy.reshape((T, N, 2, len(self.streams))).transpose((2, 0, 1, 3)).reshape((2*len(self.streams), T, N))
         else:
             # Reshape 3D: (T, N*3, S) -> (T, N, 3, S) -> (3, T, N, S) -> (3*S, T, N)
             data_reshaped = data_npy.reshape((T, N, 3, len(self.streams))).transpose((2, 0, 1, 3)).reshape((3*len(self.streams), T, N))

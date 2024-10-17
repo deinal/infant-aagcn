@@ -14,7 +14,7 @@ import bin.plot as plot
 from modules.utils import get_logger, LossCallback
 from modules.data import InfantMotionDataset
 from modules.model import AdaptiveSTGCN
-from modules.constants import N, EDGE_INDEX, PHYSICAL_EDGE_INDEX
+from modules.constants import N, PHYS_EDGE_INDEX, COORD_EDGE_INDEX, FC_EDGE_INDEX
 
 
 if __name__ == '__main__':
@@ -25,21 +25,23 @@ if __name__ == '__main__':
     arg_parser.add_argument('--feature-file', default='data/features.csv', type=str)
     arg_parser.add_argument('--streams', default='j,b,v,a', type=str)
     arg_parser.add_argument('--xy-data', action='store_true')
-    arg_parser.add_argument('--physical-edges', action='store_true')
+    arg_parser.add_argument('--edges', default='phys', choices=['phys', 'coord', 'fc'], type=str)
     arg_parser.add_argument('--concat-features', action='store_true')
-    arg_parser.add_argument('--k-folds', default=5, type=int)
+    arg_parser.add_argument('--k-folds', default=10, type=int)
     arg_parser.add_argument('--log-file', type=str)
-    arg_parser.add_argument('--epochs', default=15, type=int)
+    arg_parser.add_argument('--epochs', default=20, type=int)
     arg_parser.add_argument('--batch-size', default=32, type=int)
-    arg_parser.add_argument('--learning-rate', default=0.1, type=float)
+    arg_parser.add_argument('--learning-rate', default=0.01, type=float)
+    arg_parser.add_argument('--hidden-dim', default=256, type=int)
+    arg_parser.add_argument('--kt', default=13, type=int)
     arg_parser.add_argument('--adaptive', action='store_true')
     arg_parser.add_argument('--attention', action='store_true')
     arg_parser.add_argument('--masking', action='store_true')
-    arg_parser.add_argument('--num-workers', default=16, type=int)
+    arg_parser.add_argument('--num-workers', default=8, type=int)
     arg_parser.add_argument('--devices', default=1, type=int)
     args = arg_parser.parse_args()
 
-    logger = get_logger('infant-stgnn', filename=args.log_file)
+    logger = get_logger('infant-aagcn', filename=args.log_file)
 
     for arg in vars(args):
         logger.info(f'{arg}: {getattr(args, arg)}')
@@ -50,7 +52,14 @@ if __name__ == '__main__':
     
     streams = args.streams.split(',')
 
-    edge_index = torch.tensor(PHYSICAL_EDGE_INDEX) if args.physical_edges else torch.tensor(EDGE_INDEX)
+    if args.edges == 'phys':
+        edge_index = torch.tensor(PHYS_EDGE_INDEX)
+    elif args.edges == 'coord':
+        edge_index = torch.tensor(COORD_EDGE_INDEX)
+    elif args.edges == 'fc':
+        edge_index = torch.tensor(FC_EDGE_INDEX)
+    else:
+        raise ValueError(f'Invalid edge type: {args.edges}')
 
     kfold = KFold(n_splits=args.k_folds, shuffle=False)
 
@@ -87,6 +96,8 @@ if __name__ == '__main__':
             attention=args.attention,
             masking=args.masking,
             concat_features=args.concat_features,
+            hidden_dim=args.hidden_dim,
+            kt=args.kt
         )
 
         lr_monitor = pl.callbacks.LearningRateMonitor(logging_interval='epoch')
@@ -115,7 +126,6 @@ if __name__ == '__main__':
         model = AdaptiveSTGCN.load_from_checkpoint(
             checkpoint_path=checkpointing.best_model_path,
             in_channels=2*len(streams) if args.xy_data else 3*len(streams),
-            out_channels=32,
             edge_index=edge_index,
             num_nodes=N,
             learning_rate=args.learning_rate,
@@ -123,6 +133,8 @@ if __name__ == '__main__':
             attention=args.attention,
             masking=args.masking,
             concat_features=args.concat_features,
+            hidden_dim=args.hidden_dim,
+            kt=args.kt
         )
         [results] = trainer.test(model, dataloaders=val_loader)
         
