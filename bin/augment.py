@@ -9,17 +9,21 @@ from glob import glob
 import feather
 
 
-def read_csv(f):
+def read_csv(f, use_2d):
     df = pd.read_csv(f, usecols=lambda x: x != 'timestamp')
 
     # Add neck joint between shoulders
-    for coord in ['x', 'y', 'z']:
+    coords = ['x', 'y'] if use_2d else ['x', 'y', 'z']
+    for coord in coords:
         df[f'neck_{coord}'] = (df[f'left_shoulder_{coord}'] + df[f'right_shoulder_{coord}']) / 2
-    
-    # Add hip joint between left and righ hip
-    for coord in ['x', 'y', 'z']:
+
+    # Add hip joint between left and right hip
+    for coord in coords:
         df[f'hip_{coord}'] = (df[f'left_hip_{coord}'] + df[f'right_hip_{coord}']) / 2
-    
+
+    if use_2d:
+        df = df[[col for col in df.columns if '_z' not in col]]
+
     return df
 
 def rotation_matrix_x(angle):
@@ -43,9 +47,15 @@ def rotation_matrix_z(angle):
         [0, 0, 1]
     ])
 
+def rotation_matrix_z_2d(angle):
+    return np.array([
+        [np.cos(angle), -np.sin(angle)],
+        [np.sin(angle), np.cos(angle)]
+    ])
+
 def rotate_df(df, rot_matrix):
     n_col = len(df.columns)
-    n_joints = int(n_col / 3)
+    n_joints = int(n_col / rot_matrix.shape[0])  # 2 for 2D or 3 for 3D data
     joint_coords = np.array(df.iloc[:, :]).T
     rot_matrices = np.kron(np.eye(n_joints), rot_matrix)
     joint_coords = np.dot(rot_matrices, joint_coords)
@@ -58,8 +68,15 @@ def generate_random_angle(min_angle, max_angle):
     max_radian = np.deg2rad(max_angle)
     return np.random.uniform(min_radian, max_radian)
 
-def random_rotate(df, angle):
-    """Apply random rotations to the dataframe."""
+def random_rotate_2d(df, angle):
+    """Apply random 2D rotation around z-axis."""
+    angle_z = generate_random_angle(-angle, angle)
+    rot_z = rotation_matrix_z_2d(angle_z)
+    df = rotate_df(df, rot_z)
+    return df
+
+def random_rotate_3d(df, angle):
+    """Apply random 3D rotations to the dataframe."""
     angle_x = generate_random_angle(-angle, angle)
     angle_y = generate_random_angle(-angle, angle)
     angle_z = generate_random_angle(-angle, angle)
@@ -88,6 +105,7 @@ if __name__ == '__main__':
     arg_parser.add_argument('-o', '--out-dir', type=str)
     arg_parser.add_argument('-n', '--num-rotations', type=int)
     arg_parser.add_argument('-a', '--angle', default=5, type=int)
+    arg_parser.add_argument('--use-2d', action='store_true')
     args = arg_parser.parse_args()
 
     os.makedirs(os.path.join(args.out_dir, args.location), exist_ok=True)
@@ -98,12 +116,12 @@ if __name__ == '__main__':
         dfs_list = []
         
         # Save original dataframe
-        df = read_csv(f)
+        df = read_csv(f, args.use_2d)
         dfs_list.append(('original', df))
         
         # Random rotations
         for i in range(args.num_rotations):
-            rotated_df = random_rotate(df, args.angle)
+            rotated_df = random_rotate_2d(df.copy(), args.angle) if args.use_2d else random_rotate_3d(df.copy(), args.angle)
             dfs_list.append((f'rotation_{i}', rotated_df))
         
         # Convert list of dataframes to multi-index dataframe

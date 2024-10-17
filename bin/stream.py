@@ -7,34 +7,34 @@ import pandas as pd
 from tqdm import tqdm
 from glob import glob
 import feather
-from modules.constants import T, NODE_INDEX, PHYSICAL_EDGES
+from modules.constants import T, NODE_INDEX, PHYS_EDGE_LABELS
 
-
-def create_b_stream(df, edges):
+def create_b_stream(df, edges, use_2d=False):
     b_stream_df = pd.DataFrame()
+    coords_to_use = ['x', 'y'] if use_2d else ['x', 'y', 'z']
 
-    # Iterate over edge labels to determine source and target joints
     for source_joint, target_joint in edges:
-        for coord in ['x', 'y', 'z']:
-            # Calculate the bone vector: target - source
+        for coord in coords_to_use:
             b_stream_df[f'{target_joint}_{coord}'] = df[f'{target_joint}_{coord}'] - df[f'{source_joint}_{coord}']
 
     return b_stream_df
 
-def create_v_stream(df, joints):
+def create_v_stream(df, joints, use_2d=False):
     v_stream_df = pd.DataFrame()
+    coords_to_use = ['x', 'y'] if use_2d else ['x', 'y', 'z']
 
     for joint in joints:
-        for coord in ['x', 'y', 'z']:
+        for coord in coords_to_use:
             v_stream_df[f'{joint}_{coord}'] = df[f'{joint}_{coord}'].diff().fillna(0)
 
     return v_stream_df
 
-def create_a_stream(df, joints):
+def create_a_stream(df, joints, use_2d=False):
     a_stream_df = pd.DataFrame()
+    coords_to_use = ['x', 'y'] if use_2d else ['x', 'y', 'z']
 
     for joint in joints:
-        for coord in ['x', 'y', 'z']:
+        for coord in coords_to_use:
             a_stream_df[f'{joint}_{coord}'] = df[f'{joint}_{coord}'].diff().fillna(0)
 
     return a_stream_df
@@ -45,6 +45,7 @@ if __name__ == '__main__':
     arg_parser.add_argument('-l', '--location')
     arg_parser.add_argument('-i', '--in-dir')
     arg_parser.add_argument('-o', '--out-dir')
+    arg_parser.add_argument('--use-2d', action='store_true')
     args = arg_parser.parse_args()
 
     flist = glob(os.path.join(args.in_dir, args.location, '*.feather'))
@@ -52,8 +53,8 @@ if __name__ == '__main__':
     os.makedirs(os.path.join(args.out_dir, args.location), exist_ok=True)
 
     joints = list(NODE_INDEX.keys())
-    joints_xyz = [joint + suffix for joint in joints for suffix in ['_x', '_y', '_z']]
-    edges = [('neck', 'neck')] + PHYSICAL_EDGES
+    joints_xyz = [joint + suffix for joint in joints for suffix in (['_x', '_y'] if args.use_2d else ['_x', '_y', '_z'])]
+    edges = [('neck', 'neck')] + PHYS_EDGE_LABELS
 
     for f in tqdm(flist, desc=f'Creating {args.location} streams'):
         df_multi = feather.read_dataframe(f)
@@ -62,9 +63,9 @@ if __name__ == '__main__':
 
         for augment_name, df in df_multi.groupby(level=0):
             j_df = df.loc[:, joints_xyz]
-            b_df = create_b_stream(j_df.copy(), edges)
-            v_df = create_v_stream(j_df.copy(), joints)
-            a_df = create_a_stream(v_df.copy(), joints)
+            b_df = create_b_stream(j_df.copy(), edges, use_2d=args.use_2d)
+            v_df = create_v_stream(j_df.copy(), joints, use_2d=args.use_2d)
+            a_df = create_a_stream(v_df.copy(), joints, use_2d=args.use_2d)
 
             if j_df.isnull().values.any():
                 print(f'Found NaN values in augmentation: {augment_name} of file: {f}. Skipping.')
@@ -85,7 +86,6 @@ if __name__ == '__main__':
                 (augment_name, 'a'): a_repeated
             }))
 
-        # Concatenate data for all augmentations and streams
         final_data = pd.concat(all_data)
 
         # Save as Feather file
