@@ -1,7 +1,10 @@
 data
 slurm
 results
-figures
+figures/*.eps
+figures/*.pdf
+metadata
+predictions
 lightning_logs
 __pycache__
 .ipynb_checkpoints

@@ -1,16 +1,16 @@
 # infant-aagcn
 
-[![arXiv](https://img.shields.io/badge/arXiv-2402.14400-b31b1b.svg)](https://arxiv.org/abs/2402.14400)
+[![arXiv](https://img.shields.io/badge/arXiv-2402.14400-b31b1b.svg)](https://arxiv.org/abs/2402.14400) [![zenodo](https://img.shields.io/badge/zenodo-14269866-green.svg)](https://doi.org/10.5281/zenodo.14269866)
 
-PyTorch Implementation of Modeling 3D Infant Kinetics Using Adaptive
-Graph Convolutional Networks.
+PyTorch Lightning Implementation of Learning Developmental Age from 3D Infant Kinetics Using Adaptive Graph Neural Networks.
 
-<img src="graphs.png" width="600px"/>
+<img src="figures/graphs.png" width="700px"/>
 
 ## Environment
 
 ### Cluster
 
+Install or load a PyTorch module, then install packages. The `env.sh` script puts `bin/` on path where all executables reside.
 ```
 module load pytorch/1.13
 pip install -Ur requirements.txt
@@ -23,45 +23,89 @@ pip install -Ur requirements.txt
 docker run -v $(pwd):/work/infant-aagcn -w /work/infant-aagcn --user $(id -u):$(id -g) --gpus all --shm-size 16g -it infant-aagcn
 ```
 
-## Preprocessing
+## Data and models
 
-Data (2 zip archives, 4.8GB) available upon request. Preprocessing expects .csv files with joint coordinates over time.
+Start by downloading the corresponding zip archives from [Zenodo](https://doi.org/10.5281/zenodo.14269866).
 
+Unzip metadata:
+```
+unzip metadata.zip
+
+metadata/
+├── combined.csv
+```
+
+Unzip data:
+```
+unzip data.zip
+
+data/
+├── features.csv
+├── streams
+│   └── combined
+│       ├── *.feather
+├── streams_2d
+    └── combined
+        ├── *.feather
+```
+
+Unzip the results archive (to use already trained models):
+```
+unzip results.zip
+
+results/
+├── aagcn/
+│   ├── fold_1/
+│   │   ├── train_predictions.npy
+│   │   ├── val_predictions.npy
+│   │   ├── best_model.ckpt
+│   │   ├── metadata.json
+│   │   ├── ...
+│   ├── ...
+├── ...
+```
+The two most relevant models are `jb-aagcn-coord-xy` (2D) and `jb-aagcn-coord` (3D).
+
+Unzip MNI predictions for the 2D and 3D models:
+```
+unzip predictions.zip
+predictions/
+├── jb-aagcn-coord-xy_predictions.csv
+├── jb-aagcn-coord_predictions.csv
+```
+
+### Preprocessing
+
+Open data has already been preprocessed. For completeness the steps applied to raw data were:
 ```
 unzip.sh
 preprocess.sh
 ```
+Currently one of the preprocessing scripts, `bin/augment.py`, has `-n 0` rotations applied. Augmentations could be worthwhile exploring in future work.
 
-- Extract zip archives
-- Select time intervals
-- Center skeleton around neck joint
-- Rotate around principal axes
-- Create feature streams
+## Train and predict
 
-## Training
-
-By running the env script bin is put on path where all executables reside. The modules folder contain the models and dataloader etc. 
-
+Example command to train the `JB-AAGCN` model on typical infants:
 ```
 train.py \
   --data-dir data/streams/combined \
-  --output-dir results/aagcn \
-  --age-file metadata/combined.csv \
-  --learning-rate 0.01 \
-  --batch-size 32 \
-  --num-workers 16 \
-  --streams j \
-  --k-folds 10 \
-  --epochs 20 \
+  --output-dir results/jb-aagcn-coord \
+  --streams j,b \
   --adaptive \
-  --attention
+  --attention \
+  --edges coord
 ```
 
-Slurm: `sbatch run/submit.sh` or for the full comparison `sbatch run/experiment.sh`
+Then run predictions on MNI subjects:
+```
+predict.py --model-dir results/jb-aagcn-coord --output-dir predictions
+```
 
-Training creates a results folder with all runs. The notebook folder then contains separate files for the ml baseline, aagcn inference and metrics calculation.
+The script select data segments based on the outcome in `metadata/combined.csv` where 0 to 1 is typical or at most minor impairment and 2 denotes MNI.
 
-An example of how the models can be called to make predictions is avaialable in the submit script `run/predict.sh`.
+The `notebook/` folder contains Jupyter notebooks for the ML baseline, AAGCN graph inspection, rotation preprocessing and metrics calculation.
+
+The results presented in the paper has been produced using the submit scripts in the `run/` folder.
 
 ## Cite
 
