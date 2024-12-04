@@ -69,6 +69,7 @@ The two most relevant models are `jb-aagcn-coord-xy` (2D) and `jb-aagcn-coord` (
 Unzip MNI predictions for the 2D and 3D models:
 ```
 unzip predictions.zip
+
 predictions/
 ├── jb-aagcn-coord-xy_predictions.csv
 ├── jb-aagcn-coord_predictions.csv
@@ -101,7 +102,7 @@ Then run predictions on MNI subjects:
 predict.py --model-dir results/jb-aagcn-coord --output-dir predictions
 ```
 
-The script select data segments based on the outcome in `metadata/combined.csv` where 0 to 1 is typical or at most minor impairment and 2 denotes MNI.
+The scripts above select data segments based on the outcome in `metadata/combined.csv` where 0 to 1 is typical or at most minor impairment and 2 denotes MNI.
 
 The `notebook/` folder contains Jupyter notebooks for the ML baseline, AAGCN graph inspection, rotation preprocessing and metrics calculation.
 
@@ -110,8 +111,8 @@ The results presented in the paper has been produced using the submit scripts in
 ## Cite
 
 ```BibTeX
-@article{holmberg2024modeling,
-  title={Modeling 3D Infant Kinetics Using Adaptive Graph Convolutional Networks},
+@article{holmberg2024learning,
+  title={Learning Developmental Age from 3D Infant Kinetics Using Adaptive Graph Neural Networks },
   author={Daniel Holmberg and Manu Airaksinen and Viviana Marchi and Andrea Guzzetta and Anna Kivi and Leena Haataja and Sampsa Vanhatalo and Teemu Roos},
   journal={arXiv preprint arXiv:2402.14400},
   year={2024}
