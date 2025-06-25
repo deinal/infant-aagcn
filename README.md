@@ -112,9 +112,13 @@ The results presented in the paper has been produced using the submit scripts in
 
 ```BibTeX
 @article{holmberg2024learning,
-  title={Learning Developmental Age from 3D Infant Kinetics Using Adaptive Graph Neural Networks },
-  author={Daniel Holmberg and Manu Airaksinen and Viviana Marchi and Andrea Guzzetta and Anna Kivi and Leena Haataja and Sampsa Vanhatalo and Teemu Roos},
-  journal={arXiv preprint arXiv:2402.14400},
-  year={2024}
+  author={Holmberg, Daniel and Airaksinen, Manu and Marchi, Viviana and Guzzetta, Andrea and Tuiskula, Anna and Haataja, Leena and Vanhatalo, Sampsa and Roos, Teemu},
+  journal={IEEE Transactions on Neural Systems and Rehabilitation Engineering}, 
+  title={Learning Developmental Age From 3D Infant Kinetics Using Adaptive Graph Neural Networks}, 
+  year={2025},
+  volume={33},
+  number={},
+  pages={1939-1950},
+  doi={10.1109/TNSRE.2025.3568269}
 }
 ```
